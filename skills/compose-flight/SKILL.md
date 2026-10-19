@@ -10,7 +10,7 @@ back stack. It replaces `SharedTransitionLayout` + `Modifier.sharedElement` + `N
 the two systems on the same screens.
 
 Package: `io.github.angelomarzocchi.flight`.
-Gradle: `implementation("com.github.angelomarzocchi.compose-flight:flight:<version>")` from
+Gradle: `implementation("com.github.angelomarzocchi:compose-flight:<version>")` from
 `https://jitpack.io`. minSdk 24, compileSdk 37.
 
 ## The three pieces — all three are required

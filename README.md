@@ -39,7 +39,7 @@ dependencyResolutionManagement {
 
 // build.gradle.kts of your app
 dependencies {
-    implementation("com.github.angelomarzocchi.compose-flight:flight:0.1.0")
+    implementation("com.github.angelomarzocchi:compose-flight:0.1.0")
 }
 ```
 
