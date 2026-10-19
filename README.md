@@ -8,6 +8,16 @@ instant the user taps, so going back halfway through a flight is *the same fligh
 it curves round from where it is, at the speed it has. Nothing is rewound, nothing jumps, and nothing
 waits for the page underneath to finish moving.
 
+<p align="center">
+  <img src="docs/media/flight.gif" width="320" alt="A ball flies between target A and target B on a drawn spring, turns round mid-flight and hangs between the two pages under a predictive back gesture">
+</p>
+<p align="center"><sub>
+  The two anchors of one element (dashed), the spring pulling it towards the one the back stack points at,
+  and the trail of its centre. Push, pop, a flight interrupted both ways, a predictive back gesture held,
+  cancelled and completed. Slow motion ×2 (the system animator scale, which Flight honours) ·
+  <a href="docs/media/flight.mp4">mp4</a>
+</sub></p>
+
 - **Interruptible everywhere.** Push, pop halfway, push again: the element never jumps or loses its speed.
   Pages are springs too, so the pages turn round with it.
 - **Predictive back.** Under the back gesture the element hangs between the two pages, following the
@@ -182,7 +192,9 @@ presence, so the same rule holds for them.
 
 ## Demo
 
-`demo/` is a list of planets that fly into their pages. Open the project in Android Studio and run
+`demo/` is a list of planets that fly into their pages. `ExplainActivity` is the diagram above, which
+plays by itself: `adb shell am start -n io.github.angelomarzocchi.flight.demo/.ExplainActivity` (set
+the animator duration scale to 2 in developer options for the slow-motion version). Open the project in Android Studio and run
 `demo`, or `./gradlew :demo:installDebug`. Try going back halfway through a flight, and holding a
 predictive back gesture.
 

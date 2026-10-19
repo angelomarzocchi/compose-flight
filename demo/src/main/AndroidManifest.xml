@@ -13,6 +13,10 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <activity
+            android:name=".ExplainActivity"
+            android:exported="true"
+            android:label="Flight · how it works" />
     </application>
 
 </manifest>
