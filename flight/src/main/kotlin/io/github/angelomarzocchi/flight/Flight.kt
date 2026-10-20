@@ -168,8 +168,11 @@ public class FlightHostState {
         return flights[key]?.drawnBounds(host, pagesOrigin(host), jumpPx)
     }
 
-    /** Who draws [key]'s element: "air", or the page key of the anchor it rests on. For tests. */
-    internal fun drawnBy(key: Any): Any? = flights[key]?.let { it.home?.page?.key ?: if (it.isInAir) "air" else null }
+    /**
+     * Who draws [key]'s element: `"air"` while it flies, or the key of the page whose anchor it rests
+     * on; null otherwise. For tests: which page holds it once a gesture is over.
+     */
+    public fun drawnBy(key: Any): Any? = flights[key]?.let { it.home?.page?.key ?: if (it.isInAir) "air" else null }
 }
 
 /**
