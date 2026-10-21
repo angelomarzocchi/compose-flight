@@ -25,3 +25,4 @@ dependencyResolutionManagement {
 rootProject.name = "compose-flight"
 include(":flight")
 include(":demo")
+include(":benchmark")

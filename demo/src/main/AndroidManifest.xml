@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <application
         android:enableOnBackInvokedCallback="true"
@@ -14,9 +15,31 @@
             </intent-filter>
         </activity>
         <activity
+            android:name=".TryActivity"
+            android:exported="true"
+            android:label="Flight · try both">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+        <activity
             android:name=".ExplainActivity"
             android:exported="true"
             android:label="Flight · how it works" />
+        <activity
+            android:name=".CompareActivity"
+            android:exported="true"
+            android:label="Flight · side by side" />
+        <activity
+            android:name=".BenchActivity"
+            android:exported="true"
+            android:label="Flight · benchmark" />
+
+        <!-- Lets the benchmarks trace the demo on a phone that is not rooted. -->
+        <profileable
+            android:shell="true"
+            tools:targetApi="29" />
     </application>
 
 </manifest>

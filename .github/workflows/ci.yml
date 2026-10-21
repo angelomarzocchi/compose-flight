@@ -15,11 +15,13 @@ jobs:
           distribution: temurin
           java-version: 21
       - uses: gradle/actions/setup-gradle@v4
-      - name: Unit and Robolectric tests, library and demo build
-        run: ./gradlew :flight:testDebugUnitTest :flight:assembleRelease :demo:assembleDebug
+      - name: Unit and Robolectric tests, the cost against Compose's shared elements, every build
+        run: ./gradlew :flight:testDebugUnitTest :demo:testDebugUnitTest :flight:assembleRelease :demo:assembleDebug :benchmark:assembleBenchmark
       - name: Test reports
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: test-reports
-          path: flight/build/reports/tests
+          path: |
+            flight/build/reports/tests
+            demo/build/reports/tests
