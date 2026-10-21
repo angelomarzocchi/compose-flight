@@ -22,9 +22,12 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.MotionDurationScale
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.GraphicsLayerScope
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.layer.drawLayer
+import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -147,19 +150,29 @@ internal fun <T : Any> PresenceDisplay(
     val settled = !state.moving && state.pages.all { it.atRest } && overlayScenes.isEmpty() && shownOverlays.isEmpty()
 
     Box(modifier, propagateMinConstraints = true) {
+        // A finger reaches the page on top of the stack, wherever the motion draws it. A page leaving
+        // the top but drawn over it — a pop, or a push sent back halfway — would take the touches meant
+        // for the page coming back: it is laid out under every page and drawn by a stand-in in its
+        // place, which has nothing to touch.
+        val topZ = state.pages.firstOrNull { it.key == state.currentKey }?.z ?: 0f
         state.pages.forEach { page ->
             key(page.key) {
                 val lifecycleOwner = rememberLifecycleOwner(
                     maxLifecycle = if (settled && page.key == state.currentKey) Lifecycle.State.RESUMED else Lifecycle.State.STARTED,
                 )
                 val presence = remember(page) { SpringPresence(page, state) }
+                val over = page.key != state.currentKey && page.z > topZ
+                val drawing = rememberGraphicsLayer()
                 CompositionLocalProvider(
                     LocalLifecycleOwner provides lifecycleOwner,
                     LocalPagePresence provides presence,
                 ) {
                     Box(
                         Modifier
-                            .zIndex(page.z)
+                            .zIndex(if (over) page.z - UnderEveryPage else page.z)
+                            .drawWithContent {
+                                if (over) drawing.record { this@drawWithContent.drawContent() } else drawContent()
+                            }
                             .graphicsLayer { with(page.motion) { place(page.presence, page.arriving, page.back) } },
                         propagateMinConstraints = true,
                     ) {
@@ -179,6 +192,8 @@ internal fun <T : Any> PresenceDisplay(
                         )
                     }
                 }
+                // The stand-in: the page's drawing, where the page would be drawn.
+                if (over) Spacer(Modifier.matchParentSize().zIndex(page.z).drawBehind { drawLayer(drawing) })
             }
         }
         shownOverlays.asReversed().forEach { overlay ->
@@ -478,3 +493,6 @@ private const val RestVelocity = 0.02f
 private const val NanosPerMilli = 1_000_000L
 private const val NominalFrameNanos = 16_666_667L
 private const val OverlayZ = 1_000_000f
+
+/** Below every page: where a page drawn by a stand-in is laid out. Pages count up from 0 by ones. */
+private const val UnderEveryPage = 100_000f
