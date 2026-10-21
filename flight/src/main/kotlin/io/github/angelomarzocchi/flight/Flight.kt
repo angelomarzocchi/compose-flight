@@ -29,6 +29,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.geometry.lerp
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.drawscope.inset
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.layer.GraphicsLayer
@@ -278,6 +279,10 @@ private const val MinFrameNanos = 4_166_667L
  * How an element draws itself in the air: at [size], [morph] of the way from [from]'s look to
  * [to]'s — the looks its two ends gave their [FlightAnchor]s. Drawn, not recorded: sharp at every
  * size, and nothing is laid out while it flies.
+ *
+ * The DrawScope is the element's own, as a `Canvas`'s is at rest: its origin is the element's top
+ * left and its `size` and `center` are [size]'s, so the same drawing code serves both. It is not
+ * clipped: a shadow or a glow may spill over.
  */
 public fun interface FlightPaint {
     public fun DrawScope.paint(size: Size, from: Any, to: Any, morph: Float)
@@ -801,7 +806,9 @@ internal class Flight(first: FlightAnchor) {
         if (home != null) return
         val paint = lookTo.paint ?: return
         val bounds = drawnBody(host, pagesOrigin, jumpPx)
-        translate(bounds.left, bounds.top) {
+        // Inset rather than moved: the paint's own size and centre are the element's, as a Canvas's
+        // are at rest, so a `drawCircle(color)` lands where the element is. Nothing is clipped.
+        inset(bounds.left, bounds.top, size.width - bounds.right, size.height - bounds.bottom) {
             with(paint) { paint(bounds.size, lookFrom.look, lookTo.look, body.morph) }
         }
     }

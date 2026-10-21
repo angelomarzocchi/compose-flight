@@ -14,7 +14,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.navigation3.runtime.entryProvider
@@ -31,6 +33,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
 /**
  * A ball flies between two pages of a [FlightNavDisplay] inside a [FlightHost], with the clock driven
@@ -227,6 +230,50 @@ class FlightHostTest {
             assertRestsOn(Home)
             assertNear(onHome, host.drawnBounds(BallKey))
         }
+    }
+
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE) // Drawn for real: the legacy mode never draws at all.
+    fun aPaintDrawsInTheElementsOwnBounds() {
+        // What the paint sees of its DrawScope, frame by frame, against the size it is handed.
+        val seen = mutableListOf<Pair<androidx.compose.ui.geometry.Size, androidx.compose.ui.geometry.Size>>()
+        val probe = FlightPaint { size, _, _, _ -> seen += this.size to size }
+        rule.mainClock.autoAdvance = false
+        rule.setContent {
+            val stack = remember { mutableStateListOf<Any>(Home) }
+            backStack = stack
+            FlightHost(state = host, modifier = Modifier.fillMaxSize()) {
+                FlightNavDisplay(
+                    backStack = stack,
+                    entryProvider = entryProvider {
+                        entry<Home> { Box(Modifier.fillMaxSize()) { Probe(probe, 40.dp, 20.dp, 700.dp) } }
+                        entry<Detail> { Box(Modifier.fillMaxSize()) { Probe(probe, 200.dp, 100.dp, 100.dp) } }
+                    },
+                )
+            }
+        }
+        frames(5)
+        now { backStack += Detail }
+        repeat(12) {
+            frames(1)
+            // Robolectric draws only when asked to: a capture draws the whole window.
+            rule.onRoot().captureToImage()
+        }
+        rule.runOnIdle {
+            assertTrue("drawn in the air", seen.isNotEmpty())
+            // `size` and `center` in a paint are the element's, as a Canvas's are at rest: a
+            // `drawCircle(color)` with no centre lands on the element, not on the middle of the screen.
+            seen.forEach { (scope, handed) ->
+                assertEquals(handed.width, scope.width, 0.5f)
+                assertEquals(handed.height, scope.height, 0.5f)
+            }
+        }
+    }
+
+    @Composable
+    private fun Probe(paint: FlightPaint, size: Dp, x: Dp, y: Dp) {
+        val anchor = rememberFlightAnchor(BallKey, paint)
+        Box(Modifier.offset(x, y).size(size).flightAnchor(anchor).flightHole(anchor))
     }
 
     @Test
