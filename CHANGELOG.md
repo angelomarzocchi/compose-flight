@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.0
+
+- First stable release. The API is the one of 0.2.0; from here on it follows semantic versioning.
+
 ## 0.2.0
 
 - **Fix**: a tap on the page coming back is no longer taken by the page leaving. A page leaving the
