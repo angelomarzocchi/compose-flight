@@ -112,6 +112,15 @@ val Fade = PageMotion { presence, arriving, back -> alpha = presence.coerceIn(0f
 the presence can overshoot 0..1 slightly. Override `under`/`over` to paint a backdrop or a veil inside
 the page's layer, and `covers = true` for a motion where the new page always grows over the old one.
 
+## An element under the finger
+
+To drag an element back to the previous page (a photo pulled down to its grid), drive a real back
+gesture with a `DirectNavigationEventInput` added to the `navigationEventDispatcher`, so the page behind
+is composed under it. Set `anchor.held = true` for the drag and move the element with a `graphicsLayer`
+placed before `flightAnchor`, and after any `pointerInput` that reads the finger. It stays with the
+screen, and takes off from where it is on `backCompleted()`. Pass a still `gestureMotion` for that
+gesture, or the page's fade takes the element with it, and fade the screen's own background yourself.
+
 ## Springs
 
 Defaults are Material 3 Expressive's (`FlightSprings.Default`). To follow a theme's motion scheme:

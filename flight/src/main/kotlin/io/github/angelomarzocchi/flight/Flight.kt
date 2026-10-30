@@ -316,6 +316,15 @@ public class FlightAnchor internal constructor(internal val page: FlightPage?, i
      */
     public var look: Any = Unit
 
+    /**
+     * In the screen's hands: under a back gesture the element stays on this anchor, drawn by the screen
+     * wherever the screen moves it, rather than hanging between the two pages. It takes off when the
+     * page changes, from where it is and at the speed it had. For a screen that drives the back gesture
+     * itself, with the element under the finger. Set it on the page on top before the gesture reaches
+     * the page behind.
+     */
+    public var held: Boolean = false
+
     internal var paint: FlightPaint? = null
 
     /** When it was registered: of two anchors on the page on top, the newer wins. */
@@ -617,7 +626,7 @@ internal class Flight(first: FlightAnchor) {
         val top = anchors.filter { it.placed && it.isOn(current) }.maxByOrNull { it.order }
         if (top != null) {
             val progress = navigation.gesture()
-            if (progress != null) {
+            if (progress != null && !top.held) {
                 val backPages = navigation.back
                 val back = anchors.filter { it.placed && it.isOn(backPages) }.maxByOrNull { it.order }
                 if (back != null && back !== top) return Aim.Between(top, back, progress)

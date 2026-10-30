@@ -198,6 +198,7 @@ There is no `LocalNavAnimatedContentScope` inside `FlightNavDisplay`; use `Local
 | `Modifier.flightAnchor(anchor)` / `Modifier.flightHole(anchor)` | Where the element rests here / leave its place empty while it is away. |
 | `Modifier.recordedFlightAnchor(anchor)` + `RecordedPaint` | Fly the screen's own drawing. |
 | `FlightAnchor.look` | What this end looks like, handed to your `FlightPaint` as `from`/`to`. |
+| `FlightAnchor.held` | Under a back gesture the element stays with its screen, which moves it, and takes off when the page changes. |
 | `FlightPaint { size, from, to, morph -> }` | Draws the element in the air, `morph` 0→1 from one end's look to the other's. |
 | `progressBetween(from, to, value, fallback)` | How far a growing element has grown: drive the rest of a morph off its size. |
 | `FlightLayer.Chrome` + `FlightOverlay(state, layer)` | For an element that flies out of the app bars, over them. |

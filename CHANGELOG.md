@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- **New**: `FlightAnchor.held`. Under a back gesture a held element stays with its screen, wherever the
+  screen moves it, instead of hanging between the two pages; it takes off when the page changes, from
+  where it is and at the speed it had. For a screen that drives the back gesture itself, with the
+  element under the finger (drag a photo down to go back to the grid).
 - **Fix**: an element going home to a page that is leaving fades with that page. Sent back to a list
   and tapped again straight away, an element on its way to the list was left in the air with nowhere
   on the new page to go, and stayed drawn over that page, opaque, for up to half a second until it

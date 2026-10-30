@@ -7,13 +7,17 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onRoot
@@ -224,6 +228,71 @@ class FlightHostTest {
         now { gesture.backProgressed(gestureAt(0.3f)) }
         frames(10)
         now { gesture.backCompleted() }
+        settle()
+        rule.runOnIdle {
+            assertEquals(listOf<Any>(Home), backStack.toList())
+            assertRestsOn(Home)
+            assertNear(onHome, host.drawnBounds(BallKey))
+        }
+    }
+
+    @Test
+    fun aHeldElementStaysWithItsScreenUnderTheGestureAndTakesOffWhenItCompletes() {
+        var drag by mutableFloatStateOf(0f)
+        rule.mainClock.autoAdvance = false
+        rule.setContent {
+            val stack = remember { mutableStateListOf<Any>(Home, Detail) }
+            backStack = stack
+            val owner = LocalNavigationEventDispatcherOwner.current
+            DisposableEffect(owner) {
+                val dispatcher = owner?.navigationEventDispatcher
+                dispatcher?.addInput(gesture)
+                onDispose { dispatcher?.removeInput(gesture) }
+            }
+            FlightHost(state = host, modifier = Modifier.fillMaxSize()) {
+                FlightNavDisplay(
+                    backStack = stack,
+                    onBack = { stack.removeAt(stack.lastIndex) },
+                    gestureMotion = PageMotion { _, _, _ -> },
+                    entryProvider = entryProvider {
+                        entry<Home> { Box(Modifier.fillMaxSize()) { Ball(40.dp, 20.dp, 700.dp) } }
+                        entry<Detail> {
+                            val held = rememberFlightAnchor(BallKey, ball)?.also { it.held = true }
+                            Box(Modifier.fillMaxSize()) {
+                                Box(
+                                    Modifier
+                                        .offset(100.dp, 100.dp)
+                                        .size(200.dp)
+                                        .graphicsLayer { translationY = drag }
+                                        .flightAnchor(held)
+                                        .flightHole(held),
+                                )
+                            }
+                        }
+                    },
+                )
+            }
+        }
+        frames(5)
+        now { gesture.backStarted(gestureAt(0f)) }
+        for (step in 1..10) {
+            now {
+                drag = step * 20f
+                gesture.backProgressed(gestureAt(step * 0.05f))
+            }
+            frames(1)
+        }
+        frames(10)
+        rule.runOnIdle {
+            assertFalse("still on its screen", host.isInAir(BallKey))
+            assertRestsOn(Detail)
+            assertNear(onDetail.translate(0f, 200f), host.drawnBounds(BallKey))
+        }
+
+        now { gesture.backCompleted() }
+        val path = track(8)
+        // Take-off from where the finger left it, not from the anchor's place on the page.
+        assertTrue("took off from the finger: $path", path.first().y > onDetail.center.y + 150f)
         settle()
         rule.runOnIdle {
             assertEquals(listOf<Any>(Home), backStack.toList())
