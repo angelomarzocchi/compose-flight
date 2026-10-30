@@ -27,7 +27,9 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.geometry.lerp
+import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.inset
 import androidx.compose.ui.graphics.drawscope.scale
@@ -35,6 +37,7 @@ import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.layer.GraphicsLayer
 import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.rememberGraphicsLayer
+import androidx.compose.ui.graphics.withSaveLayer
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.platform.LocalDensity
@@ -168,6 +171,9 @@ public class FlightHostState {
         val host = coordinates?.takeIf { it.isAttached } ?: return null
         return flights[key]?.drawnBounds(host, pagesOrigin(host), jumpPx)
     }
+
+    /** How opaque [key]'s element is drawn in the air; null when it is not in the air. */
+    internal fun airAlpha(key: Any): Float? = flights[key]?.takeIf { it.isInAir }?.fade
 
     /**
      * Who draws [key]'s element: `"air"` while it flies, or the key of the page whose anchor it rests
@@ -340,6 +346,9 @@ public class FlightAnchor internal constructor(internal val page: FlightPage?, i
             host?.wake()
         }
     }
+
+    /** How much of its page is left, 0 to 1; null for an anchor on no page, or a page without a presence. */
+    internal fun pageShown(): Float? = page?.shown?.value
 
     /** How far from where it rests its page is drawn: zero at rest, or for an anchor on no page. */
     internal fun pageOffset(host: LayoutCoordinates, pagesOrigin: Offset): Offset {
@@ -550,6 +559,13 @@ internal class Flight(first: FlightAnchor) {
     /** On the gesture's spring: a gesture that found it at rest. */
     private var underFinger = false
 
+    /** How opaque it is drawn in the air: below 1 only while it goes home to a page that is leaving. */
+    var fade = 1f
+        private set
+
+    /** How much of that page there was when the element was left to it. */
+    private var fadeFrom: Float? = null
+
     // The anchor whose motion the flight is carried by, and where it was a frame ago: its place, how
     // far it was scrolled, and how far it had moved on its own.
     private var scrolled: FlightAnchor? = null
@@ -661,6 +677,8 @@ internal class Flight(first: FlightAnchor) {
             lookTo = resting
             body.morph = 1f
             body.morphVelocity = 0f
+            fade = 1f
+            fadeFrom = null
             underFinger = aim is Aim.Between
             scrolled = null
             lastPageOffset = null
@@ -713,9 +731,14 @@ internal class Flight(first: FlightAnchor) {
                 scrolled = null
                 landsOn = aim.anchor
             }
-            Aim.Stay -> return
+            Aim.Stay -> {
+                // In the air with no place left to go: it rests on the end there is, which draws it if it can.
+                if (home == null) home = anchors.maxByOrNull { it.order }
+                return
+            }
         }
 
+        fadeWith(aim, dtNanos, durationScale)
         if (durationScale == 0f) {
             body.jumpTo(target, morphTarget)
         } else {
@@ -723,6 +746,22 @@ internal class Flight(first: FlightAnchor) {
         }
         // Landing: on its target and still, so the anchor draws it where it already is.
         if (landsOn != null && body.isAtRest(target, morphTarget)) home = landsOn
+    }
+
+    /**
+     * Going home to a page that is leaving, it leaves with it: drawn in the air it is over the page on
+     * top, and it would stay there, opaque, until it lands. From all there is of it, whatever the page's
+     * own fade had reached, down to nothing together with the page. Called back on top, it recovers.
+     */
+    private fun fadeWith(aim: Aim, dtNanos: Long, durationScale: Float) {
+        val shown = (aim as? Aim.Follow)?.anchor?.pageShown()
+        if (shown != null) {
+            val from = fadeFrom ?: shown.coerceAtLeast(MinFadeFrom).also { fadeFrom = it }
+            fade = minOf(fade, (shown / from).coerceIn(0f, 1f))
+        } else {
+            fadeFrom = null
+            fade = if (durationScale == 0f) 1f else (fade + dtNanos / durationScale / RecoverNanos).coerceAtMost(1f)
+        }
     }
 
     /**
@@ -803,13 +842,21 @@ internal class Flight(first: FlightAnchor) {
     }
 
     fun DrawScope.draw(host: LayoutCoordinates, pagesOrigin: Offset, jumpPx: Float) {
-        if (home != null) return
+        if (home != null || fade <= 0f) return
         val paint = lookTo.paint ?: return
         val bounds = drawnBody(host, pagesOrigin, jumpPx)
         // Inset rather than moved: the paint's own size and centre are the element's, as a Canvas's
         // are at rest, so a `drawCircle(color)` lands where the element is. Nothing is clipped.
-        inset(bounds.left, bounds.top, size.width - bounds.right, size.height - bounds.bottom) {
-            with(paint) { paint(bounds.size, lookFrom.look, lookTo.look, body.morph) }
+        val drawn = {
+            inset(bounds.left, bounds.top, size.width - bounds.right, size.height - bounds.bottom) {
+                with(paint) { paint(bounds.size, lookFrom.look, lookTo.look, body.morph) }
+            }
+        }
+        if (fade >= 1f) {
+            drawn()
+        } else {
+            // A layer, for a paint of several strokes to fade as one. Only here: a flight on its way draws straight.
+            drawIntoCanvas { it.withSaveLayer(Rect(Offset.Zero, size), Paint().apply { alpha = fade }, drawn) }
         }
     }
 
@@ -824,5 +871,11 @@ internal class Flight(first: FlightAnchor) {
         const val StuckJumps = 4f
 
         const val NanosPerSecond = 1_000_000_000f
+
+        /** Of a page all but gone: the fade measured from this, not from nothing. */
+        const val MinFadeFrom = 0.001f
+
+        /** From nothing back to opaque, when the page it was left to comes back on top. */
+        const val RecoverNanos = 100_000_000f
     }
 }

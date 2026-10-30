@@ -5,6 +5,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.Stable
+import androidx.compose.runtime.State
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
@@ -137,6 +138,9 @@ public val DefaultPageMotion: PageMotion = PageMotion { presence, arriving, back
 @Stable
 internal class FlightPage(val key: Any) {
     var coordinates: LayoutCoordinates? = null
+
+    /** How much of the page is left, 0 to 1: its presence, for what is in the air on its behalf. */
+    var shown: State<Float>? = null
 }
 
 /** The page an anchor is on; null outside a navigation entry, where an anchor is on no page. */
@@ -150,6 +154,8 @@ internal val LocalFlightPage = staticCompositionLocalOf<FlightPage?> { null }
 private fun <T : Any> flightPages(): NavEntryDecorator<T> = NavEntryDecorator { entry ->
     val page = remember(entry.contentKey) { FlightPage(entry.contentKey) }
     // The presence is PresenceDisplay's, already provided round the page.
+    val shown = LocalPagePresence.current?.rememberShown()
+    SideEffect { page.shown = shown }
     CompositionLocalProvider(LocalFlightPage provides page) {
         Box(Modifier.onPlaced { page.coordinates = it }, propagateMinConstraints = true) {
             entry.Content()

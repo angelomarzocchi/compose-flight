@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- **Fix**: an element going home to a page that is leaving fades with that page. Sent back to a list
+  and tapped again straight away, an element on its way to the list was left in the air with nowhere
+  on the new page to go, and stayed drawn over that page, opaque, for up to half a second until it
+  landed on a page nobody could see any more.
+- **Fix**: an element in the air with no place left to go rests on the end there is, rather than being
+  drawn where it last was.
+
 ## 1.0.0
 
 - First stable release. The API is the one of 0.2.0; from here on it follows semantic versioning.
