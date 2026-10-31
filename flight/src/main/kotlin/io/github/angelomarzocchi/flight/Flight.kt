@@ -326,6 +326,14 @@ public class FlightAnchor internal constructor(internal val page: FlightPage?, i
      */
     public var held: Boolean = false
 
+    /**
+     * Whether the element may land here now; until then it waits in the air, over the end, drawn whole.
+     * For an end that is itself fading, or not yet where it can show the element: landed there, the
+     * element would fade with it. Asked on every frame of flight, so it can read anything; give it
+     * something that comes true, or the element never lands.
+     */
+    public var canLand: () -> Boolean = { true }
+
     internal var paint: FlightPaint? = null
 
     /** When it was registered: of two anchors on the page on top, the newer wins. */
@@ -471,8 +479,9 @@ public class RecordedLook internal constructor(internal val layer: GraphicsLayer
  * back with it. Added rather than laid over each other, so what is the same at both ends keeps its
  * colour all the way: two layers at half opacity would let a quarter of the background through.
  *
- * [overflow]: not cut to the bounds, for ends that draw outside their box (a glow) and hold the same
- * shape at both sizes.
+ * [overflow]: not cut to the bounds, for ends that draw outside their box (a glow, up to 48 dp) and
+ * hold the same shape at both sizes. It costs larger layers while they cross-fade: give it to the ends
+ * that have something to spill.
  */
 public class RecordedPaint(private val single: Boolean, private val overflow: Boolean = false) : FlightPaint {
     override fun DrawScope.paint(size: Size, from: Any, to: Any, morph: Float) {
@@ -503,12 +512,21 @@ public class RecordedPaint(private val single: Boolean, private val overflow: Bo
                 // The second end is added to the first in a layer of their own: alone, it would be
                 // added to what is behind the flight as well.
                 drawIntoCanvas { canvas ->
-                    // Larger than the bounds: an end with [overflow] draws outside them.
-                    val margin = size.maxDimension
-                    canvas.saveLayer(Rect(-margin, -margin, size.width + margin, size.height + margin), Paint())
-                    drawRecording(a, size, 1f - toward)
-                    drawRecording(b, size, toward, BlendMode.Plus)
-                    canvas.restore()
+                    if (overflow) {
+                        // A recording drawn see-through passes through a layer of its own size, which
+                        // would cut what spills out of it: here the layers are larger, and it is drawn whole.
+                        val margin = OverflowMargin.toPx()
+                        val bounds = Rect(-margin, -margin, size.width + margin, size.height + margin)
+                        canvas.withSaveLayer(bounds, Paint()) {
+                            canvas.withSaveLayer(bounds, Paint().apply { alpha = 1f - toward }) { drawRecording(a, size, 1f) }
+                            canvas.withSaveLayer(bounds, Paint().apply { alpha = toward; blendMode = BlendMode.Plus }) { drawRecording(b, size, 1f) }
+                        }
+                    } else {
+                        canvas.withSaveLayer(Rect(Offset.Zero, size), Paint()) {
+                            drawRecording(a, size, 1f - toward)
+                            drawRecording(b, size, toward, BlendMode.Plus)
+                        }
+                    }
                 }
             }
         }
@@ -522,6 +540,9 @@ public class RecordedPaint(private val single: Boolean, private val overflow: Bo
         scale(scale, scale, pivot = Offset.Zero) { drawLayer(look.layer) }
     }
 }
+
+/** How far outside its box an end of [RecordedPaint] with `overflow` can draw. */
+private val OverflowMargin = 48.dp
 
 /**
  * How far an element in the air has gone from one end's look to the other's, read off its own size:
@@ -780,7 +801,7 @@ internal class Flight(first: FlightAnchor) {
             body.step((dtNanos / durationScale).toLong(), target, morphTarget, spring, springs.effects)
         }
         // Landing: on its target and still, so the anchor draws it where it already is.
-        if (landsOn != null && body.isAtRest(target, morphTarget)) home = landsOn
+        if (landsOn != null && landsOn.canLand() && body.isAtRest(target, morphTarget)) home = landsOn
     }
 
     /**
