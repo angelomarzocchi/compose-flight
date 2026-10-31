@@ -200,6 +200,7 @@ There is no `LocalNavAnimatedContentScope` inside `FlightNavDisplay`; use `Local
 | `FlightAnchor.look` | What this end looks like, handed to your `FlightPaint` as `from`/`to`. |
 | `FlightAnchor.held` | Under a back gesture the element stays with its screen, which moves it, and takes off when the page changes. |
 | `FlightAnchor.canLand` | Whether the element may land on this end now: until then it waits in the air, drawn whole. For an end that is itself fading. |
+| `FlightAnchor.hasOtherEnd()` | Whether it has another end, laid out: an element that will fly stays out of its screen's fade, or it takes off dimmed and turns whole in the air. |
 | `FlightPaint { size, from, to, morph -> }` | Draws the element in the air, `morph` 0→1 from one end's look to the other's. |
 | `progressBetween(from, to, value, fallback)` | How far a growing element has grown: drive the rest of a morph off its size. |
 | `FlightLayer.Chrome` + `FlightOverlay(state, layer)` | For an element that flies out of the app bars, over them. |

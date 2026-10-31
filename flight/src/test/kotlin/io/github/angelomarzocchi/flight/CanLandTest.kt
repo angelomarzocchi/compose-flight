@@ -39,6 +39,7 @@ class CanLandTest {
     private val paint = FlightPaint { size, _, _, _ -> drawRect(Color.Red, size = size) }
     private var second by mutableStateOf(false)
     private var landable = false
+    private var firstEnd: FlightAnchor? = null
 
     private fun run(n: Int) = repeat(n) {
         rule.mainClock.advanceTimeByFrame()
@@ -57,6 +58,7 @@ class CanLandTest {
                         entry<Page> {
                             Box(Modifier.fillMaxSize()) {
                                 val first = rememberFlightAnchor(Key, paint)
+                                firstEnd = first
                                 Box(Modifier.size(40.dp).flightAnchor(first).flightHole(first))
                                 if (second) {
                                     val end = rememberFlightAnchor(Key, paint)
@@ -70,6 +72,15 @@ class CanLandTest {
             }
         }
         run(5)
+    }
+
+    @Test
+    fun anEndKnowsWhenThereIsAnother() {
+        start()
+        assertFalse(rule.runOnIdle { firstEnd!!.hasOtherEnd() })
+        second = true
+        run(3)
+        assertTrue(rule.runOnIdle { firstEnd!!.hasOtherEnd() })
     }
 
     @Test

@@ -337,6 +337,12 @@ public class FlightAnchor internal constructor(internal val page: FlightPage?, i
      */
     public var canLand: () -> Boolean = { true }
 
+    /**
+     * Whether the element has another end to fly to or from, laid out. Such an element should stay out of
+     * any fade of its screen's: it would take off dimmed and turn whole in the air. Reads snapshot state.
+     */
+    public fun hasOtherEnd(): Boolean = flight?.anchors?.any { it !== this && it.placed } == true
+
     internal var paint: FlightPaint? = null
 
     /** When it was registered: of two anchors on the page on top, the newer wins. */
