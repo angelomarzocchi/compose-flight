@@ -42,6 +42,9 @@ import androidx.compose.ui.graphics.withSaveLayer
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.toSize
 import kotlinx.coroutines.channels.Channel
@@ -442,9 +445,13 @@ public fun Modifier.flightHole(anchor: FlightAnchor?): Modifier =
  * anchor's paint.
  *
  * Recorded whether or not it is shown, so the arriving end has a recording from its first frame.
+ *
+ * [spill]: how far outside its box the element draws (a border centred on its edge, a glow), for a
+ * [RecordedPaint] with `overflow`. A recording cross-fading passes through a layer of its own size, and
+ * what is beyond that is cut. The larger, the costlier: give it what it needs.
  */
 @Composable
-public fun Modifier.recordedFlightAnchor(anchor: FlightAnchor?): Modifier {
+public fun Modifier.recordedFlightAnchor(anchor: FlightAnchor?, spill: Dp = 0.dp): Modifier {
     if (anchor == null) return this
     val layer = rememberGraphicsLayer()
     val look = remember(anchor, layer) { RecordedLook(layer) }
@@ -452,8 +459,13 @@ public fun Modifier.recordedFlightAnchor(anchor: FlightAnchor?): Modifier {
     return this
         .flightAnchor(anchor)
         .drawWithContent {
-            layer.record { this@drawWithContent.drawContent() }
+            val pad = spill.roundToPx()
+            layer.topLeft = IntOffset(-pad, -pad)
+            layer.record(IntSize(size.width.toInt() + 2 * pad, size.height.toInt() + 2 * pad)) {
+                translate(pad.toFloat(), pad.toFloat()) { this@drawWithContent.drawContent() }
+            }
             look.size = size
+            look.spill = pad.toFloat()
             if (!anchor.isAway()) {
                 // The host may have drawn it see-through, cross-fading in the air.
                 layer.alpha = 1f
@@ -466,6 +478,9 @@ public fun Modifier.recordedFlightAnchor(anchor: FlightAnchor?): Modifier {
 /** One end's recording, and how big it was: the look [recordedFlightAnchor] gives its anchor. */
 public class RecordedLook internal constructor(internal val layer: GraphicsLayer) {
     internal var size: Size = Size.Zero
+
+    /** How far outside [size] it was recorded, in pixels. */
+    internal var spill = 0f
 }
 
 /**
@@ -479,9 +494,8 @@ public class RecordedLook internal constructor(internal val layer: GraphicsLayer
  * back with it. Added rather than laid over each other, so what is the same at both ends keeps its
  * colour all the way: two layers at half opacity would let a quarter of the background through.
  *
- * [overflow]: not cut to the bounds, for ends that draw outside their box (a glow, up to 48 dp) and
- * hold the same shape at both sizes. It costs larger layers while they cross-fade: give it to the ends
- * that have something to spill.
+ * [overflow]: not cut to the bounds, for ends that draw outside their box (a glow) and hold the same
+ * shape at both sizes. How far outside is each end's `spill`, in [recordedFlightAnchor].
  */
 public class RecordedPaint(private val single: Boolean, private val overflow: Boolean = false) : FlightPaint {
     override fun DrawScope.paint(size: Size, from: Any, to: Any, morph: Float) {
@@ -511,21 +525,11 @@ public class RecordedPaint(private val single: Boolean, private val overflow: Bo
             } else {
                 // The second end is added to the first in a layer of their own: alone, it would be
                 // added to what is behind the flight as well.
+                val margin = if (overflow) maxOf(a.spill * size.width / a.size.width, b.spill * size.width / b.size.width) else 0f
                 drawIntoCanvas { canvas ->
-                    if (overflow) {
-                        // A recording drawn see-through passes through a layer of its own size, which
-                        // would cut what spills out of it: here the layers are larger, and it is drawn whole.
-                        val margin = OverflowMargin.toPx()
-                        val bounds = Rect(-margin, -margin, size.width + margin, size.height + margin)
-                        canvas.withSaveLayer(bounds, Paint()) {
-                            canvas.withSaveLayer(bounds, Paint().apply { alpha = 1f - toward }) { drawRecording(a, size, 1f) }
-                            canvas.withSaveLayer(bounds, Paint().apply { alpha = toward; blendMode = BlendMode.Plus }) { drawRecording(b, size, 1f) }
-                        }
-                    } else {
-                        canvas.withSaveLayer(Rect(Offset.Zero, size), Paint()) {
-                            drawRecording(a, size, 1f - toward)
-                            drawRecording(b, size, toward, BlendMode.Plus)
-                        }
+                    canvas.withSaveLayer(Rect(-margin, -margin, size.width + margin, size.height + margin), Paint()) {
+                        drawRecording(a, size, 1f - toward)
+                        drawRecording(b, size, toward, BlendMode.Plus)
                     }
                 }
             }
@@ -540,9 +544,6 @@ public class RecordedPaint(private val single: Boolean, private val overflow: Bo
         scale(scale, scale, pivot = Offset.Zero) { drawLayer(look.layer) }
     }
 }
-
-/** How far outside its box an end of [RecordedPaint] with `overflow` can draw. */
-private val OverflowMargin = 48.dp
 
 /**
  * How far an element in the air has gone from one end's look to the other's, read off its own size:
