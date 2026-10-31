@@ -113,7 +113,7 @@ dependencyResolutionManagement {
 
 // build.gradle.kts of your app
 dependencies {
-    implementation("com.github.angelomarzocchi:compose-flight:1.1.0")
+    implementation("com.github.angelomarzocchi:compose-flight:1.1.1")
 }
 ```
 

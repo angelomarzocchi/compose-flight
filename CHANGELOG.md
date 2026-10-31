@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.1
+
+- JitPack builds the library again: use this version. 1.1.0 was tagged but never built, so it cannot be installed.
+
 ## 1.1.0
 
 - **New**: `FlightAnchor.canLand`. An end that is itself fading can keep the element in the air, drawn
