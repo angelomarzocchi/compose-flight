@@ -27,6 +27,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.geometry.lerp
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
@@ -448,6 +449,7 @@ public fun Modifier.recordedFlightAnchor(anchor: FlightAnchor?): Modifier {
             if (!anchor.isAway()) {
                 // The host may have drawn it see-through, cross-fading in the air.
                 layer.alpha = 1f
+                layer.blendMode = BlendMode.SrcOver
                 drawLayer(layer)
             }
         }
@@ -466,33 +468,57 @@ public class RecordedLook internal constructor(internal val layer: GraphicsLayer
  * [single]: only the larger end's recording, shrunk to the smaller's — one picture at two sizes,
  * sharp all the way because a recording is drawing, not pixels. Otherwise the two cross-fade as the
  * bounds go from one end's size to the other's: the fade spread over the whole flight, and turned
- * back with it.
+ * back with it. Added rather than laid over each other, so what is the same at both ends keeps its
+ * colour all the way: two layers at half opacity would let a quarter of the background through.
+ *
+ * [overflow]: not cut to the bounds, for ends that draw outside their box (a glow) and hold the same
+ * shape at both sizes.
  */
-public class RecordedPaint(private val single: Boolean) : FlightPaint {
+public class RecordedPaint(private val single: Boolean, private val overflow: Boolean = false) : FlightPaint {
     override fun DrawScope.paint(size: Size, from: Any, to: Any, morph: Float) {
         val a = from as? RecordedLook ?: return
         val b = to as? RecordedLook ?: return
-        clipRect(0f, 0f, size.width, size.height) {
-            if (single) {
-                // The larger, once it has been recorded at all: the end just arrived may not have been.
-                val recorded = listOf(a, b).filter { it.size.width > 0f }
-                recorded.maxByOrNull { it.size.width }?.let { drawRecording(it, size, 1f) }
-            } else {
-                val toward = when {
-                    b.size.width <= 0f -> 0f
-                    a.size.width <= 0f -> 1f
-                    else -> progressBetween(a.size, b.size, size, morph)
-                }
+        if (overflow) {
+            paintEnds(a, b, size, morph)
+        } else {
+            clipRect(0f, 0f, size.width, size.height) { paintEnds(a, b, size, morph) }
+        }
+    }
+
+    private fun DrawScope.paintEnds(a: RecordedLook, b: RecordedLook, size: Size, morph: Float) {
+        if (single) {
+            // The larger, once it has been recorded at all: the end just arrived may not have been.
+            val recorded = listOf(a, b).filter { it.size.width > 0f }
+            recorded.maxByOrNull { it.size.width }?.let { drawRecording(it, size, 1f) }
+        } else {
+            val toward = when {
+                b.size.width <= 0f -> 0f
+                a.size.width <= 0f -> 1f
+                else -> progressBetween(a.size, b.size, size, morph)
+            }
+            if (toward <= 0f || toward >= 1f) {
                 drawRecording(a, size, 1f - toward)
                 drawRecording(b, size, toward)
+            } else {
+                // The second end is added to the first in a layer of their own: alone, it would be
+                // added to what is behind the flight as well.
+                drawIntoCanvas { canvas ->
+                    // Larger than the bounds: an end with [overflow] draws outside them.
+                    val margin = size.maxDimension
+                    canvas.saveLayer(Rect(-margin, -margin, size.width + margin, size.height + margin), Paint())
+                    drawRecording(a, size, 1f - toward)
+                    drawRecording(b, size, toward, BlendMode.Plus)
+                    canvas.restore()
+                }
             }
         }
     }
 
-    private fun DrawScope.drawRecording(look: RecordedLook, size: Size, alpha: Float) {
+    private fun DrawScope.drawRecording(look: RecordedLook, size: Size, alpha: Float, blend: BlendMode = BlendMode.SrcOver) {
         if (alpha <= 0f || look.size.width <= 0f || look.size.height <= 0f) return
         val scale = size.width / look.size.width
         look.layer.alpha = alpha.coerceAtMost(1f)
+        look.layer.blendMode = blend
         scale(scale, scale, pivot = Offset.Zero) { drawLayer(look.layer) }
     }
 }
