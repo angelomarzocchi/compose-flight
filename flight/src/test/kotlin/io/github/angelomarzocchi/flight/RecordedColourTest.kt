@@ -44,6 +44,7 @@ class RecordedColourTest {
     private val host = FlightHostState()
     private val paint = RecordedPaint(single = false, overflow = true)
     private var second by mutableStateOf(false)
+    private var firstThere by mutableStateOf(true)
 
     private fun run(n: Int) = repeat(n) {
         rule.mainClock.advanceTimeByFrame()
@@ -61,8 +62,10 @@ class RecordedColourTest {
                     entryProvider = entryProvider {
                         entry<Page> {
                             Box(Modifier.fillMaxSize()) {
-                                val first = rememberFlightAnchor(Key, paint)
-                                Box(Modifier.offset(40.dp, 40.dp).size(100.dp).recordedFlightAnchor(first, spill.dp).drawBehind { drawRect(colour) })
+                                if (firstThere) {
+                                    val first = rememberFlightAnchor(Key, paint)
+                                    Box(Modifier.offset(40.dp, 40.dp).size(100.dp).recordedFlightAnchor(first, spill.dp).drawBehind { drawRect(colour) })
+                                }
                                 if (second) {
                                     val end = rememberFlightAnchor(Key, paint)
                                     Box(Modifier.offset(40.dp, 300.dp).size(200.dp).recordedFlightAnchor(end, spill.dp).drawBehind { drawRect(colour) })
@@ -93,6 +96,25 @@ class RecordedColourTest {
             }
         }
         assertTrue("never in the air", seen.isNotEmpty())
+        assertTrue("at rest $rest, in the air $seen", seen.all { abs(it - rest) < 0.02f })
+    }
+
+    /** The end it left goes away while it flies: what is left of the cross-fade is one recording, not two. */
+    @Test
+    fun anEndGoingAwayInFlightDoesNotDoubleTheOther() {
+        val colour = Color.White.copy(alpha = 0.3f)
+        start(colour, 0)
+        val rest = centre()
+        second = true
+        run(4)
+        assertTrue(rule.runOnIdle { host.isInAir(Key) })
+        firstThere = false
+        val seen = buildList {
+            repeat(30) {
+                run(1)
+                if (rule.runOnIdle { host.isInAir(Key) }) add(centre())
+            }
+        }
         assertTrue("at rest $rest, in the air $seen", seen.all { abs(it - rest) < 0.02f })
     }
 

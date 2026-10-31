@@ -669,8 +669,14 @@ internal class Flight(first: FlightAnchor) {
             // Its page went with the element on it: the element goes with whichever end is left.
             home = anchors.maxByOrNull { it.order }
         }
-        if (lookFrom === anchor) lookFrom = lookTo
-        if (lookTo === anchor) lookTo = lookFrom
+        if (lookFrom === anchor || lookTo === anchor) {
+            // One look left, whichever way the morph had got to: it is all there is to draw, once.
+            val left = if (lookFrom === anchor) lookTo else lookFrom
+            lookFrom = left
+            lookTo = left
+            body.morph = 1f
+            body.morphVelocity = 0f
+        }
         if (aimedAt === anchor) aimedAt = null
         if (scrolled === anchor) scrolled = null
     }

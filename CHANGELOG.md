@@ -4,6 +4,9 @@
 
 - **New**: `FlightAnchor.canLand`. An end that is itself fading can keep the element in the air, drawn
   whole, until it can show it: landed there, the element would fade with it, or vanish.
+- **Fix**: an end going away while its element flies no longer doubles the element's light. The cross-fade
+  was left halfway between two looks that were now the same one, so `RecordedPaint` added a recording to
+  itself until the element landed.
 - **New**: `FlightAnchor.hasOtherEnd()`, to keep an element that will fly out of its screen's fade.
 - **New**: `recordedFlightAnchor(anchor, spill)`. With `RecordedPaint(overflow = true)`, what an end draws
   outside its box is no longer cut while the ends cross-fade (a border centred on the edge lost half its
